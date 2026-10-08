@@ -1,0 +1,147 @@
+<htmlDOCTYPE html>
+    <html lang="en">
+
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>单线条字体绘制</title>
+            <style>
+                h1 {
+                    width: 600px;
+                    margin: 0 auto;
+                    text-align: center;
+                }
+
+                #s {
+                    width: 660px;
+                    margin: 0 auto;
+                }
+
+                #input {
+                    width: 500px;
+                    height: 50px;
+                    margin-right: 20px;
+                    padding: 10px;
+                    font-family: '仿宋';
+                    font-size: 22px;
+                    font-weight: bold;
+                    color: #36f;
+                    border: 1px solid #ccc;
+                }
+
+                #btn {
+                    width: 100px;
+                    height: 50px;
+                    background-color: #36f;
+                    color: #fff;
+                    border: none;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    font-size: 16px;
+                }
+
+                .result {
+                    width: 660px;
+                    margin: 10px auto;
+                }
+
+                #shape {
+                    display: flex;
+                    flex-wrap: wrap;
+                    justify-content: left;
+                }
+
+                #result.active {
+                    font-size: 12px;
+                    border: 1px solid #369;
+                    padding: 10px;
+                }
+
+                .shape {
+                    display: inline-block;
+                }
+
+                #about {
+                    font-size: 12px;
+                }
+            </style>
+            <!-- 通过 CDN 引入 -->
+            <script src="https://unpkg.com/gbk.js/dist/gbk.min.js"></script>
+        </head>
+
+        <body>
+            <!-- 引入字体 -->
+            <h1>单线条字体绘制</h1>
+            <div id="s">
+                <input type="text" id="input" value="中国China">
+                <button id="btn">提交</button>
+            </div>
+            <div id="result" class='result'></div>
+            <div id='about' class='result' title='Canvas'> *每个字路径数组 [ 笔画[ 点[x,y].... ]... ] </div>
+            <div id="shape" class='result' title='SVG'></div>
+            <script>
+                const btn = document.getElementById('btn');
+                btn.addEventListener('click', search_words_to_svghtml);
+
+                function char_to_shape_number(char) {
+                    const gbkBytes = GBK.encode(char);
+                    if (gbkBytes.length == 2) {
+                        var id = '0x' + gbkBytes[0].toString(16) + gbkBytes[1].toString(16);
+                        return String(Number(id));
+                    }
+                    return char.charCodeAt(0);
+                }
+                function search_words_to_svghtml() {
+                    const input = document.getElementById('input');
+                    const shape_html = document.getElementById('shape');
+                    const result_html = document.getElementById('result');
+                    var words = input.value.trim().split('');
+                    var shape_nums = [];
+                    var fonts = {};
+                    for (let i = 0; i < words.length; i++) {
+                        var word = words[i];
+                        var shape_num = char_to_shape_number(word);
+                        shape_nums.push(shape_num);
+                        fonts[shape_num] = { 'word': word, 'path': '' };
+                    }
+                    var res = shape_nums.join(',');
+                    fetch('https://font.str.xx.kg/words?' + res)
+                        .then(response => response.json())
+                        .then(data => {
+                            var svg_html = '';
+                            for (let shape of shape_nums) {
+                                var path = data[shape];
+                                var width = shape > 1000 ? 90 : 45;
+                                svg_html += `
+                                <div class="shape">
+                                <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="${width}" height="100" viewBox="0 0 ${width} 100" ">
+                                    <g id="${fonts[shape]['word']}" transform="translate(-6,100)">
+                                        <path d="${path}" stroke="red" stroke-width="1" fill="none" />
+                                    </g>
+                                    </svg>
+                                </div>
+                                `;
+                                fonts[shape]['path'] = svg_paths(path);
+                            }
+                            var _words = {};
+                            for (let font in fonts) {
+                                _words[fonts[font]['word']] = fonts[font]['path'];
+                            }
+                            var _res = {};
+                            for (let word of words) {
+                                _res[word] = _words[word];
+                            }
+                            shape_html.innerHTML = svg_html;
+                            result_html.innerHTML = JSON.stringify(_res);
+                            result_html.classList.add('active');
+
+                        });
+                }
+                function svg_paths(path) {
+                    return path.slice(1).split('M').map(item => item.split('L')).map(item => item.map(point => point.trim().split(' ')).map(p => [Number(p[0]), -Number(p[1])]));
+                }
+                search_words_to_svghtml();
+            </script>
+        </body>
+
+    </html>
